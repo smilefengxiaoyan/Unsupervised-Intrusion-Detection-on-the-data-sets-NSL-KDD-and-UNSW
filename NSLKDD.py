@@ -45,7 +45,7 @@ def load_nsl_kdd_dataset_test():
     return df
 
 def attack_type_file():
-    df = pd.read_csv('/Users/smile/Desktop/maste paper/python project/KDD/Attack Types.csv', header=None,names=['name', 'attack_type'])
+    df = pd.read_csv('/Users/smile/Desktop/maste paper/master project/KDD/Attack Types.csv', header=None,names=['name', 'attack_type'])
 
     return df
 
