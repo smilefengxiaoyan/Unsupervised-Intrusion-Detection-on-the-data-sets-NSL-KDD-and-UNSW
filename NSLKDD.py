@@ -20,7 +20,7 @@ def load_nsl_kdd_dataset_train():
     ]
 
     # Read data from CSV file
-    df = pd.read_csv('/Users/smile/Desktop/maste paper/python project/KDD/KDDTrain+.txt', header=None, names=feature_names)
+    df = pd.read_csv('/Users/smile/Desktop/maste paper/master project/KDD/KDDTrain+.txt', header=None, names=feature_names)
 
     return df
 
@@ -40,7 +40,7 @@ def load_nsl_kdd_dataset_test():
     ]
 
     # Read data from CSV file
-    df = pd.read_csv('/Users/smile/Desktop/maste paper/python project/KDD/KDDTest+.txt', header=None, names=feature_names)
+    df = pd.read_csv('/Users/smile/Desktop/maste paper/master project/KDD/KDDTest+.txt', header=None, names=feature_names)
 
     return df
 

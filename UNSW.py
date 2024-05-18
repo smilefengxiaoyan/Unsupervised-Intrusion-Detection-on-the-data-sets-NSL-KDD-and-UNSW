@@ -4,7 +4,7 @@ from collections import Counter
 import seaborn as sns
 
 # 读取UNSW-NB15数据集
-UNSW = pd.read_csv('/Users/smile/Desktop/maste paper/python project/UNSW/Training and Testing Sets/UNSW_NB15_training-set.csv')
+UNSW = pd.read_csv('/Users/smile/Desktop/maste paper/master project/UNSW/Training and Testing Sets/UNSW_NB15_training-set.csv')
 
 # 去重处理，获取唯一的攻击类型
 unique_attack_types = UNSW['attack_cat'].unique()
