@@ -31,9 +31,9 @@ class AE(nn.Module):
             nn.Linear(hidden_size[0], hidden_size[1]),
             self.active_f() # Again, instantiate ELU
         )
-
+        self.latent = nn.Linear(hidden_size[1], hidden_size[2])
         self.decoder = nn.Sequential(
-            nn.Linear(hidden_size[1], hidden_size[2]),
+
             nn.ELU(),  # Proper instantiation
             nn.Linear(hidden_size[2], output_size),
             nn.Sigmoid()  # Sigmoid for output activation
@@ -46,9 +46,11 @@ class AE(nn.Module):
 
     def forward(self, x):
         x = self.encoder(x)
-        x = self.dropout(x)  # 根据模型类型应用 Dropout
-        x = self.decoder(x)
-        return x
+        x = self.dropout(x)
+        latent = self.latent(x)
+        x = self.decoder(latent)
+        print(latent)
+        return x, latent
 
 def training(M_type, train_features, init_lr, active_f, input_size, hidden_size, output_size, train_dataset,num_train,train_size):
 
@@ -84,8 +86,8 @@ def training(M_type, train_features, init_lr, active_f, input_size, hidden_size,
 
                 optimizer.zero_grad()
 
-
-                loss = loss_fun(model(X.float()), X.float())
+                reconstructed, latent = model(X.float())
+                loss = loss_fun(reconstructed, X.float())
 
 
 
@@ -99,7 +101,9 @@ def training(M_type, train_features, init_lr, active_f, input_size, hidden_size,
 
             x.append(epoch)
             y.append(total_loss / len(train_dataloader))
-
+        # Save the model state
+        model_path = './trained_model.pth'
+        torch.save(model.state_dict(), model_path)
         # To plot variable importances
         for name, param in model.named_parameters():
             if param.requires_grad:
@@ -154,3 +158,14 @@ def select_features(training_data, train_dataset, features_rank):
         print("\nVariance", np.var(features_rank))
 
         return selct_features
+
+# Function to calculate reconstruction errors
+def calculate_reconstruction_errors(data_loader, model):
+    reconstruction_errors = []
+    with torch.no_grad():
+        for data in data_loader:
+            data = data.to(device)
+            reconstructed, _ = model(data)
+            errors = torch.mean((data - reconstructed) ** 2, dim=1).cpu().numpy()
+            reconstruction_errors.extend(errors)
+    return np.array(reconstruction_errors)
