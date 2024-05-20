@@ -92,7 +92,7 @@ if __name__ == "__main__":
     label_all = pd.concat([train_label, test_label], axis=0)
     print(label_all)
     print(test_label)
-    sns.countplot(x='attack_type', hue='type', data=label_all)
+
 
 
 
@@ -106,38 +106,6 @@ if __name__ == "__main__":
 
 
 
-    # Print descriptive statistics of the dataset
-    print("\nDescriptive statistics of NSL-KDD dataset:")
-    print(nsl_kdd_df.describe())
 
-    # Count distribution of attack types
-    print("\nDistribution of attack types:")
-    print(nsl_kdd_df['attack_type'].value_counts())
-
-    unknown_attacks = nsl_kdd_df[nsl_kdd_df['attack_type'] == 'unknown']
-    print("Number of samples with unknown attack types:", len(unknown_attacks))
-    print("Characteristics of samples with unknown attack types:")
-    print(unknown_attacks.head())
-    # Count distribution of different difficulty levels
-    print("\nDistribution of difficulty levels:")
-    print(nsl_kdd_df['difficulty_level'].value_counts())
-
-    # Count frequency of attack types
-    attack_type_counts = nsl_kdd_df['attack_type'].value_counts()
-
-    # Plot a pie chart
-    plt.figure(figsize=(8, 8))
-    plt.pie(attack_type_counts, labels=attack_type_counts.index, autopct='%1.1f%%', startangle=140)
-    plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-    plt.title('Attack Types Distribution')
-    plt.show()
-
-    ###### Date situation
-    missing_values = nsl_kdd_df.isnull().sum()
-    print("missing values：\n", missing_values)
-
-    threshold = 3  # 3 mal std
-    outliers = nsl_kdd_df[(nsl_kdd_df - nsl_kdd_df.mean()).abs() > threshold * nsl_kdd_df.std()].dropna()
-    print("outliers：\n", outliers)
 
 

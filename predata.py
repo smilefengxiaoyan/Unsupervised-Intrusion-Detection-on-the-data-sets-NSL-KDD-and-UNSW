@@ -1,15 +1,16 @@
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import MinMaxScaler
-
-def integer_encode(dataset):
+from sklearn.preprocessing import LabelEncoder
+def int_encode(dataset):
     features_list = dataset.select_dtypes(include='object')
-    OHE = OneHotEncoder()
-    for i in features_list:
-        dataset[i] = OHE.fit_transform(dataset[i])
+    le = LabelEncoder()
+
+    for x in features_list :
+        dataset[x] = le.fit_transform(dataset[x])
     return dataset
 
 
-def normalize_dataset(features):
+def normalize_data(features):
     scaler = MinMaxScaler()
     features = scaler.fit_transform(features)
     return features

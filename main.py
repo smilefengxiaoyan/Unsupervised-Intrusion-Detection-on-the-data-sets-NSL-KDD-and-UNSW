@@ -1,41 +1,176 @@
-# This is a sample Python script.
+import argparse
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import matplotlib.pyplot as plt
+import csv
+from sklearn.preprocessing import LabelEncoder
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+import predata as prep
+import AE as AE
+
+"""
+my_parser = argparse.ArgumentParser()
+my_parser.add_argument('--dataset', action='store', type=str, required=True)
+my_parser.add_argument('--feature_selector', action='store', type=str, required=True)
+#my_parser.add_argument('--classifier', action='store', type=str, required=True)
+
+args = my_parser.parse_args()
+
+print("\n\n########Autorncoder of Network Intrusion ########\n")
+
+print("\nModel Details:\n")
+
+v = vars(args)
+
+print("Dataset: ", v["dataset"])
+print("Feature Selection Algorithm: ", v["feature_selector"])
+#print("Classification Algorithm: ", v["classifier"])
+
+dataset = v["dataset"]
+M_type = v["feature_selector"]
+#class_algo = v["classifier"]
+"""
+dataset = "NSLKDD"
 
 
-def print_hi(name):
+if dataset == "UNSWNB15":
 
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
-import time
+    training_df = pd.read_csv('/Users/smile/Desktop/master paper/master project/UNSW/Training and Testing Sets/UNSW_NB15_training-set.csv')
+    testing_df = pd.read_csv('/Users/smile/Desktop/master paper/master project/UNSW/Training and Testing Sets/UNSW_NB15_testing-set.csv')
 
-# 定义一个需要计算的复杂数学函数
-def complex_math_calculation():
-    result = 0
-    for i in range(1000000):
-        result += i * i
-    return result
+    training_df = training_df.dropna()
+    testing_df = testing_df.dropna()
 
-# 测试计算机算力的函数
-def test_computer_speed():
-    start_time = time.time()  # 记录开始时间
-    result = complex_math_calculation()  # 执行复杂数学计算
-    end_time = time.time()  # 记录结束时间
-    calculation_time = end_time - start_time  # 计算运算时间
-    print("计算完成！结果为：", result)
-    print("计算耗时：", calculation_time, "秒")
+    orig = np.array(testing_df)
+    orig_labels = orig[0:50000, 43]
 
-# 执行测试
-if __name__ == "__main__":
-    kdd_features = set(nsl_kdd_train.columns)
-    # 获取UNSW-NB15数据集的特征列表
-    unsw_features = set(UNSW.columns)
+    training_df = prep.int_encode(training_df)
+    testing_df = prep.int_encode(testing_df)
+
+    training_data = np.array(training_df)
+    testing_data = np.array(testing_df)
+
+    training_labels = training_data[0:150000, 43]
+    training_features = training_data[0:150000, 0:43]
+
+    testing_labels = testing_data[0:50000, 43]
+    testing_features = testing_data[0:50000, 0:43]
+
+    # Perform normalization on dataset
+    training_features = prep.normalize_data(training_features)
+    testing_features = prep.normalize_data(testing_features)
+
+    inputs_size= 43
+    hidden_size = [38, 30, 38]
+    output_size = 43
+    num_train =20
+    train_size = 10000
+
+    lr = 0.001
+    active_f = F.elu
+
+    print("\nPerforming Feature Selection... \n")
+    # Selecting features from chosen dataset
 
 
-# Press the green button in the gutter to run the script.
+    M_type ="Simple"
+    print("\nSimple model... \n")
+    select_fea_si = []
+    select_fea_si = AE.training(M_type, training_features, lr, active_f, inputs_size, hidden_size,  output_size, training_df,num_train,train_size)
+    select_fea_si.append(43)
+    rank = len(select_fea_si)
+
+
+    M_type = "AEDropout"
+    print("\nWith Dropout model... \n")
+    select_fea = []
+    select_fea = AE.training(M_type, training_features, lr, active_f, inputs_size, hidden_size, output_size,
+                             training_df, num_train, train_size)
+    select_fea.append(43)
+    rank = len(select_fea)
+
+
+    result_df = pd.DataFrame({
+        'simple': select_fea_si,
+        'dropout': select_fea
+    })
+
+    # Save the DataFrame to CSV, without the index
+    result_df.to_csv('UNSWselected_features.csv', index=False)
 
 
 
+elif dataset == "NSLKDD":
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    training_df = pd.read_csv("/Users/smile/Desktop/master paper/master project/KDD/NSL_KDDTrain+.csv", header=None)
+    testing_df = pd.read_csv("/Users/smile/Desktop/master paper/master project/KDD/NSL_KDDTest+.csv", header=None)
+
+    training_df = training_df.dropna()
+    testing_df = testing_df.dropna()
+
+    orig = np.array(testing_df)
+    orig_labels = orig[0:40000, 41]
+
+    training_df = prep.int_encode(training_df)
+    testing_df = prep.int_encode(testing_df)
+
+    training_data = np.array(training_df)
+    testing_data = np.array(testing_df)
+
+    training_labels = training_data[0:120000, 41]
+    training_features = training_data[0:120000, 0:41]
+
+    testing_labels = testing_data[0:40000, 41]
+    testing_features = testing_data[0:40000, 0:41]
+
+    # Perform normalization on dataset
+    training_features = prep.normalize_data(training_features)
+    testing_features = prep.normalize_data(testing_features)
+
+    inputs_size = 41
+    hidden_size = [35, 30, 35]
+    output_size = 41
+    num_train = 20
+    train_size = 10000
+
+
+
+    lr = 0.001
+    active_f = nn.ELU
+
+    print("\nPerforming Feature Selection... \n")
+
+    M_type = "Simple"
+    print("\nSimple model... \n")
+
+    # Selecting features from chosen dataset
+    select_fea_si = []
+
+    select_fea_si = AE.training(M_type, training_features, lr, active_f, inputs_size, hidden_size, output_size,training_df,num_train,train_size)
+
+    select_fea_si.append(41)
+    rank= len(select_fea_si)
+
+    M_type = "AEDropout"
+    print("\nWith Dropout model... \n")
+
+    # Selecting features from chosen dataset
+    select_fea = []
+
+    select_fea = AE.training(M_type, training_features, lr, active_f, inputs_size, hidden_size, output_size,
+                             training_df, num_train, train_size)
+
+    select_fea.append(41)
+    rank = len(select_fea)
+
+    result_df = pd.DataFrame({
+        'simple': select_fea_si,
+        'dropout': select_fea
+        })
+
+    # Save the DataFrame to CSV, without the index
+    result_df.to_csv('Nslkddselected_features.csv', index=False)
