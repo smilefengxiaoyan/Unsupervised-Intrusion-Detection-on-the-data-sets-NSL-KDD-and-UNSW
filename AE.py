@@ -49,7 +49,7 @@ class AE(nn.Module):
         x = self.dropout(x)
         latent = self.latent(x)
         x = self.decoder(latent)
-        print(latent)
+
         return x, latent
 
 def training(M_type, train_features, init_lr, active_f, input_size, hidden_size, output_size, train_dataset,num_train,train_size):
@@ -161,11 +161,28 @@ def select_features(training_data, train_dataset, features_rank):
 
 # Function to calculate reconstruction errors
 def calculate_reconstruction_errors(data_loader, model):
+    model.eval()
     reconstruction_errors = []
-    with torch.no_grad():
-        for data in data_loader:
-            data = data.to(device)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    for data in data_loader:
+        # Check if data is a tuple which often happens with DataLoader objects where data and labels are returned
+        if isinstance(data, tuple) and len(data) > 0:
+            data = data[0]  # Assuming data is the first element of the tuple
+
+        # Convert Pandas DataFrame to tensor if that's the data type
+        if isinstance(data, pd.DataFrame):
+            data = torch.tensor(data.values, dtype=torch.float32)
+
+        # Ensure data is already a tensor (which it should be if properly prepared)
+        if not isinstance(data, torch.Tensor):
+            raise TypeError("Data must be a tensor but got type: {}".format(type(data)))
+
+        data = data.to(device)
+
+        with torch.no_grad():
             reconstructed, _ = model(data)
-            errors = torch.mean((data - reconstructed) ** 2, dim=1).cpu().numpy()
-            reconstruction_errors.extend(errors)
+            error = torch.mean((data - reconstructed) ** 2, dim=1)
+            reconstruction_errors.extend(error.cpu().numpy())
+
     return np.array(reconstruction_errors)

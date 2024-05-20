@@ -8,7 +8,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import csv
 from sklearn.preprocessing import LabelEncoder
-
+from torch.utils.data import TensorDataset, DataLoader
 import predata as prep
 import AE as AE
 
@@ -194,20 +194,25 @@ elif dataset == "NSLKDD_laten":
     lr = 0.001
     active_f = nn.ELU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    select_fea_si = AE.training(M_type, training_features, lr, active_f, inputs_size, hidden_size, output_size,
+                                training_df, num_train, train_size)
     model = AE.AE(M_type, training_features, lr, active_f, inputs_size, hidden_size, output_size, training_df,num_train,train_size)
     model.load_state_dict(torch.load('./trained_model.pth'))
     model.to(device)
     model.eval()
 
+    tensor_data = torch.tensor(training_df.values, dtype=torch.float32)  # Convert DataFrame to tensor
+    dataset = TensorDataset(tensor_data)  # Create a TensorDataset
+    #data_loader = DataLoader(dataset, batch_size=64, shuffle=True)  # Use DataLoader to handle batching
+
+    train_errors = AE.calculate_reconstruction_errors(dataset, model)
 
 
 
-
-    train_errors = AE.calculate_reconstruction_errors(train_dataset, model)
     threshold = np.percentile(train_errors, 95)  # 95th percentile as threshold
 
 # Detecting anomalies on new data
-    test_errors = AE.calculate_reconstruction_errors(test_dataset, model)
+    test_errors = AE.calculate_reconstruction_errors(testing_df, model)
     anomalies = test_errors > threshold
 
 # Visualization of the threshold and errors
