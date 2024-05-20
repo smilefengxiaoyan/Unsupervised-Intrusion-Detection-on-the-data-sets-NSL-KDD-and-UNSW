@@ -12,28 +12,6 @@ from sklearn.preprocessing import LabelEncoder
 import predata as prep
 import AE as AE
 
-"""
-my_parser = argparse.ArgumentParser()
-my_parser.add_argument('--dataset', action='store', type=str, required=True)
-my_parser.add_argument('--feature_selector', action='store', type=str, required=True)
-#my_parser.add_argument('--classifier', action='store', type=str, required=True)
-
-args = my_parser.parse_args()
-
-print("\n\n########Autorncoder of Network Intrusion ########\n")
-
-print("\nModel Details:\n")
-
-v = vars(args)
-
-print("Dataset: ", v["dataset"])
-print("Feature Selection Algorithm: ", v["feature_selector"])
-#print("Classification Algorithm: ", v["classifier"])
-
-dataset = v["dataset"]
-M_type = v["feature_selector"]
-#class_algo = v["classifier"]
-"""
 dataset = "NSLKDD"
 
 
