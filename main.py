@@ -156,6 +156,7 @@ elif dataset == "NSLKDD":
 
 
 elif dataset == "NSLKDD_laten":
+    print("Start")
 
     training_df = pd.read_csv("/Users/smile/Desktop/master paper/master project/KDD/NSL_KDDTrain+.csv", header=None)
     testing_df = pd.read_csv("/Users/smile/Desktop/master paper/master project/KDD/NSL_KDDTest+.csv", header=None)
@@ -201,18 +202,21 @@ elif dataset == "NSLKDD_laten":
     model.to(device)
     model.eval()
 
-    tensor_data = torch.tensor(training_df.values, dtype=torch.float32)  # Convert DataFrame to tensor
+    tensor_data = torch.tensor(training_features, dtype=torch.float32)  # Convert DataFrame to tensor
     dataset = TensorDataset(tensor_data)  # Create a TensorDataset
-    #data_loader = DataLoader(dataset, batch_size=64, shuffle=True)  # Use DataLoader to handle batching
+
 
     train_errors = AE.calculate_reconstruction_errors(dataset, model)
 
 
 
-    threshold = np.percentile(train_errors, 95)  # 95th percentile as threshold
+    threshold = np.percentile(train_errors, 98)  # 98th percentile as threshold
 
 # Detecting anomalies on new data
-    test_errors = AE.calculate_reconstruction_errors(testing_df, model)
+    test_data = torch.tensor(testing_features, dtype=torch.float32)  # Convert DataFrame to tensor
+    testset = TensorDataset(test_data)  # Create a TensorDataset
+    test_errors = AE.calculate_reconstruction_errors(testset, model)
+    #latent_variables =
     anomalies = test_errors > threshold
 
 # Visualization of the threshold and errors

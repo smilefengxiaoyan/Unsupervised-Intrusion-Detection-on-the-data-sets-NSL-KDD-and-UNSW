@@ -70,7 +70,7 @@ def training(M_type, train_features, init_lr, active_f, input_size, hidden_size,
 
 
 
-        loss_fun = nn.MSELoss()
+        loss_fun = nn.MSELoss()  # MSE
 
         train_dataloader = torch.utils.data.DataLoader(train_features, batch_size=batch_size, shuffle=True)
 
@@ -141,8 +141,8 @@ def select_features(training_data, train_dataset, features_rank):
         plt.close()
         plt.rcParams['figure.figsize'] = (20, 20)
         x_vals = np.arange(len(features))
-        print(x_vals.shape)
-        print(len(features_rank))
+        #print(x_vals.shape)
+        #print(len(features_rank))
         plt.bar(x_vals, features_rank, align='center', alpha=1)
         plt.xticks(x_vals, features)
         plt.xlabel("Feature Indices")
@@ -181,7 +181,13 @@ def calculate_reconstruction_errors(data_loader, model):
         data = data.to(device)
 
         with torch.no_grad():
-            reconstructed, _ = model(data)
+            reconstructed, laten = model(data)
+            print(laten)
+
+            if data.dim() == 1:
+                data = data.unsqueeze(1)
+            if reconstructed.dim() == 1:
+                reconstructed = reconstructed.unsqueeze(1)
             error = torch.mean((data - reconstructed) ** 2, dim=1)
             reconstruction_errors.extend(error.cpu().numpy())
 
