@@ -67,14 +67,16 @@ def training(M_type, train_features, init_lr, active_f, input_size, hidden_size,
         x = []
         y = []
         rank = []
-
+        # Store all data points' latent features and corresponding errors
+        all_latent = []
+        all_errors = []
 
 
         loss_fun = nn.MSELoss()  # MSE
 
         train_dataloader = torch.utils.data.DataLoader(train_features, batch_size=batch_size, shuffle=True)
 
-        for epoch in range(1, num_epoch):
+        for epoch in range(0, num_epoch):
 
             model.train()
 
@@ -95,6 +97,12 @@ def training(M_type, train_features, init_lr, active_f, input_size, hidden_size,
                 optimizer.step()
 
                 total_loss += loss.item()
+                # Collecting data for saving
+                error = torch.mean((X - reconstructed) ** 2, dim=1)  # Error per data point
+                if epoch == num_epoch-1:
+                    for lat, err in zip(latent, error):
+                        all_latent.append(lat.detach().cpu().numpy())  # Detach before converting to numpy
+                        all_errors.append(err.item())
 
             print("epoch {} loss {}".format(epoch, total_loss / len(train_dataloader)))
             init_lr = init_lr * (0.7 ** (epoch // 25))
@@ -117,10 +125,15 @@ def training(M_type, train_features, init_lr, active_f, input_size, hidden_size,
         plt.ylabel("Autoencoder Training loss")
         plt.show()
 
-        features_rank = feature_importance(rank)
-        bf = select_features(train_features, train_dataset, features_rank)
+        #features_rank = feature_importance(rank)
+        #bf = select_features(train_features, train_dataset, features_rank)
+        # Data preparation for CSV
+        df = pd.DataFrame(all_latent)
+        df['Error'] = all_errors  # Add errors as a column in the DataFrame
+        # df.to_csv('latent_and_errors.csv', index=False)
+        # print("Latent features and errors saved to 'latent_and_errors.csv'")
 
-        return bf
+        return df
 
 def feature_importance(rank):
 
@@ -163,6 +176,7 @@ def select_features(training_data, train_dataset, features_rank):
 def calculate_reconstruction_errors(data_loader, model):
     model.eval()
     reconstruction_errors = []
+    combined_data = []
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     for data in data_loader:
@@ -181,14 +195,21 @@ def calculate_reconstruction_errors(data_loader, model):
         data = data.to(device)
 
         with torch.no_grad():
-            reconstructed, laten = model(data)
-            print(laten)
+            reconstructed,latent = model(data)
+              # Assuming the second part is latent data
+
+            # Convert tensors to pandas DataFrames
+
+
 
             if data.dim() == 1:
-                data = data.unsqueeze(1)
+                data = data.unsqueeze(0)
             if reconstructed.dim() == 1:
-                reconstructed = reconstructed.unsqueeze(1)
+                reconstructed = reconstructed.unsqueeze(0)
+
+
             error = torch.mean((data - reconstructed) ** 2, dim=1)
             reconstruction_errors.extend(error.cpu().numpy())
+
 
     return np.array(reconstruction_errors)

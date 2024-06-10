@@ -20,7 +20,7 @@ def load_nsl_kdd_dataset_train():
     ]
 
     # Read data from CSV file
-    df = pd.read_csv('/Users/smile/Desktop/maste paper/master project/KDD/KDDTrain+.txt', header=None, names=feature_names)
+    df = pd.read_csv('/Users/smile/Desktop/master paper/master project/KDD/KDDTrain+.txt', header=None, names=feature_names)
 
     return df
 
@@ -40,12 +40,12 @@ def load_nsl_kdd_dataset_test():
     ]
 
     # Read data from CSV file
-    df = pd.read_csv('/Users/smile/Desktop/maste paper/master project/KDD/KDDTest+.txt', header=None, names=feature_names)
+    df = pd.read_csv('/Users/smile/Desktop/master paper/master project/KDD/KDDTest+.txt', header=None, names=feature_names)
 
     return df
 
 def attack_type_file():
-    df = pd.read_csv('/Users/smile/Desktop/maste paper/master project/KDD/Attack Types.csv', header=None,names=['name', 'attack_type'])
+    df = pd.read_csv('/Users/smile/Desktop/master paper/master project/KDD/Attack Types.csv', header=None,names=['name', 'attack_type'])
 
     return df
 
@@ -89,23 +89,60 @@ if __name__ == "__main__":
     train_label['type'] = 'train'
     test_label = nsl_kdd_test['attack_type']
     test_label['type'] = 'test'
-    label_all = pd.concat([train_label, test_label], axis=0)
-    print(label_all)
-    print(test_label)
+    train_label = nsl_kdd_train[['attack_type']].copy()
+    train_label['type'] = 'train'
+    test_label = nsl_kdd_test[['attack_type']].copy()
+    test_label['type'] = 'test'
+
+    # Combine the labels and reset the index
+    label_all = pd.concat([train_label, test_label], axis=0).reset_index(drop=True)
+
+    # Calculate counts for each attack type in train and test sets
+    label_counts = label_all.groupby(['attack_type', 'type']).size().unstack().fillna(0)
 
 
 
+    # Sum totals for each dataset type
+    total_train_test = label_counts.sum(axis=0)
 
+    # Calculate the percentage of each attack type within each dataset
+    label_percent = label_counts.div(total_train_test, axis=1) * 100
 
-    # Print basic information of the dataset
-    print("Basic information of NSL-KDD dataset:")
-    print(nsl_kdd_train.info())
-    print(nsl_kdd_test.info())
+    # Define the desired order for the categories
+    categories = ['normal', 'dos', 'probe', 'r2l', 'u2r', 'unknown']
 
+    # Convert 'attack_type' into a categorical type with a defined order
+    label_percent['attack_type'] = pd.Categorical(label_percent.index, categories=categories, ordered=True)
 
+    # Sort the DataFrame by the new categorical type
+    label_percent.sort_index(inplace=True)
+    print(label_percent.index)
 
+    # Plotting code (assuming label_percent has already been set up for plotting)
+    fig, ax = plt.subplots(figsize=(14, 8))
+    ind = range(len(label_percent))
+    width = 0.35
 
+    # Creating bar plots
+    train_bars = ax.bar(ind, label_percent['train'], width, label='Train', color='b')
+    test_bars = ax.bar([p + width for p in ind], label_percent['test'], width, label='Test', color='r')
 
+    # Labels, title, and ticks
+    ax.set_xlabel('Attack Type', fontsize=14)
+    ax.set_ylabel('Percentage', fontsize=14)
+    ax.set_title('Distribution of Attack Types in Training and Test Sets in NSLKDD', fontsize=16)
+    ax.set_xticks([p + width / 2 for p in ind])
+    ax.set_xticklabels(label_percent.index, rotation=45, ha='right')
 
+    # Legend and grid
+    ax.legend(title='Dataset Type', fontsize=12)
+    ax.grid(axis='y', linestyle='--', linewidth=0.7)
 
+    plt.tight_layout()
+    plt.show()
 
+    # Filter the training dataset for 'normal' attacks only
+    #normal_train_data = nsl_kdd_train[nsl_kdd_train['attack_type'] == 'normal']
+
+    # Save the filtered data to a new CSV file
+    #normal_train_data.to_csv('normal_train_data_nsl.csv', index=False)
