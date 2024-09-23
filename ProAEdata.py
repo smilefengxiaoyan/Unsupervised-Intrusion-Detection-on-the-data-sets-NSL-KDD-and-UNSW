@@ -14,7 +14,7 @@ import AE as AE
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
+from NSLKDD import  get_NSLKDD
 
 dataset = "NSLKDD_latent"
 
@@ -162,36 +162,18 @@ elif dataset == "NSLKDD":
 elif dataset == "NSLKDD_latent":
     print("Start")
 
-    nsl_kdd_train = pd.read_csv("/Users/smile/Desktop/master paper/master project/KDD/NSL_KDDTrain+.csv", header=None)
-    testing_df = pd.read_csv("/Users/smile/Desktop/master paper/master project/KDD/NSL_KDDTest+.csv", header=None)
-    training_df = nsl_kdd_train[nsl_kdd_train.iloc[:, 41] == 'normal']
-    training_df = training_df.dropna()
-    testing_df = testing_df.dropna()
 
-    orig = np.array(testing_df)
-    orig_labels = orig[:, 41]
 
-    training_df = prep.int_encode(training_df)
-    testing_df = prep.int_encode(testing_df)
+    seed = 42
+    dataset = get_NSLKDD(seed, show=False)
+    training_features=dataset['x_train']
+    testing_features= dataset['x_test']
 
-    training_data = np.array(training_df)
-    testing_data = np.array(testing_df)
-
-    training_labels = training_data[:, 41]
-    training_features = training_data[:, 0:41]
-
-    testing_labels = testing_data[:, 41]
-    testing_features = testing_data[:, 0:41]
-
-    # Perform normalization on dataset
-    training_features = prep.normalize_data(training_features)
-    testing_features = prep.normalize_data(testing_features)
-
-    inputs_size = 41
-    hidden_size = [20, 15, 20]
-    output_size = 41
-    num_train = 20
-    train_size = 10000
+    inputs_size = 122
+    hidden_size = [61, 32,16,32, 61]
+    output_size = 122
+    num_train = 200
+    train_size = 1000
     M_type= None
 
 
@@ -199,11 +181,11 @@ elif dataset == "NSLKDD_latent":
     lr = 0.001
     active_f = nn.ELU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    select_latent_train= AE.training(M_type, training_features, lr, active_f, inputs_size, hidden_size, output_size,
-                                training_df, num_train, train_size)
+    select_latent_train= AE.training(M_type, testing_features, lr, active_f, inputs_size, hidden_size, output_size,
+                                 num_train, train_size)
 
 
-    model = AE.AE(M_type, training_features, lr, active_f, inputs_size, hidden_size, output_size, training_df,num_train,train_size)
+    model = AE.AE(M_type, training_features, lr, active_f, inputs_size, hidden_size, output_size,num_train,train_size)
     model.load_state_dict(torch.load('./trained_model.pth'))
     model.to(device)
     model.eval()
@@ -221,7 +203,7 @@ elif dataset == "NSLKDD_latent":
     threshold = np.percentile(train_errors, 98)  # 98th percentile as threshold
 
 # Detecting anomalies on new data
-    test_data = torch.tensor(testing_features, dtype=torch.float32)  # Convert DataFrame to tensor
+    test_data = torch.tensor(training_features, dtype=torch.float32)  # Convert DataFrame to tensor
     testset = TensorDataset(test_data)  # Create a TensorDataset
     test_errors = AE.calculate_reconstruction_errors(testset, model)
     #latent_variables =
@@ -239,9 +221,9 @@ elif dataset == "NSLKDD_latent":
 # Print anomaly detection results
     print("Detected Anomalies:", np.sum(anomalies))
 
-### processing testing data
+### processing testing data or train
 
-    tensor_data = torch.tensor(testing_features, dtype=torch.float32)
+    tensor_data = torch.tensor(training_features, dtype=torch.float32)
     reconstructed,select_latent_test = model.forward(tensor_data)
     error = torch.mean((tensor_data - reconstructed) ** 2, dim=1)
     # Data preparation for CSV
@@ -254,15 +236,15 @@ elif dataset == "NSLKDD_latent":
     test_NSL['Error'] = error_numpy
 
 
-    test_NSL.to_csv('test_20latent_and_errors.csv', index=False)
-    print("Latent features and errors saved to 'latent_and_errors.csv'")
+    #test_NSL.to_csv('train_30_latent_and_errors.csv', index=False)
+    #print("Latent features and errors saved to 'latent_and_errors.csv'")
 
 
 
-####HERE is for dataprocessing  for SVM model
+####HERE is for dataprocessing  for OCSVM model
 
 
-latent_df = pd.read_csv("/Users/smile/Desktop/master paper/master project/KDD/test_20latent_and_errors.csv")
+latent_df = pd.read_csv("/Users/smile/Desktop/master paper/master project/KDD/train_30_latent_and_errors.csv")
 
 
 
@@ -296,4 +278,4 @@ latent_df['Label'] = (train_errors > threshold).astype(int)
 latent_df.drop('Error', axis=1, inplace=True)
 
 
-latent_df.to_csv("processed_test_latent20_and_labels.csv")
+latent_df.to_csv("processed_train_latent_30_and_labels.csv")

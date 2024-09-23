@@ -11,10 +11,10 @@ from sklearn.metrics import precision_score, recall_score, f1_score, confusion_m
 from sklearn.model_selection import KFold
 from sklearn.metrics import roc_curve
 import numpy as np
-from latent import Autoencoder
-import torch.optim as optim
-import torch.nn as nn
-from tensorflow import keras
+
+# This is AE—NOCSVM-GMM Model
+
+
 
 set = "UNSW"
 
@@ -59,8 +59,6 @@ else:
 
 
 
-
-
 # Data scaling  nslkdd already done
 scaler = MinMaxScaler()
 
@@ -74,18 +72,19 @@ print("Train Set")
 print("train_set_orginal")
 
 
-model = Autoencoder(train_set_orginal.shape[1])
-optimizer = keras.optimizers.Adam()
-loss_fn = keras.losses.MeanSquaredError()
-model.compile(optimizer, loss_fn)
-
-model.fit(train_set_orginal, train_set_orginal, batch_size=64, epochs=100)
-
-
-train_normal_or = model.get_reconstruction_error(train_set_orginal)
+# Train Nested OCSVM
+ # Number of layers for nested OCSVM
+start_time = time.time()
+ocsvm = OneClassSVM(gamma='auto', verbose=2)
+ocsvm.fit(train_set)
 
 
+svc_duration = time.time() - start_time
 
+
+
+
+print(f"Trained Nested OCSVM in {svc_duration:.2f} seconds")
 
 
 
@@ -105,20 +104,17 @@ for train_index, test_index in skf.split(test_set, true_labels):
     X_train, X_test = test_set.iloc[train_index], test_set.iloc[test_index]
     y_train, y_test = true_labels[train_index], true_labels[test_index]
 
+
+    # Predictions using OCSVM
     X_train_nomaly = X_train[y_train == 1]
+    ocsvm.fit(X_train_nomaly )
+    yp = ocsvm.predict(X_test)
 
-    model.fit(X_train_nomaly , X_train_nomaly , batch_size=64, epochs=10)
-    train_normal_re = model.get_reconstruction_error(X_train_nomaly)
-    alpha = 1
-    threshold = np.concatenate([train_normal_re, train_normal_or]).mean() * alpha
-    best_thresh = np.percentile(np.concatenate([train_normal_re, train_normal_or]), 90)
-
-    test_label_predict = model.predict_class(X_test, best_thresh)
 
 
     y_test = 1 - (y_test + 1) / 2
-
-    verified_anomalies = (test_label_predict == 1)
+    # Boolean array where True indicates an outlier
+    verified_anomalies = (yp == -1)
 
     # Convert verified_anomalies to the same format as true labels
     verified_anomaly_preds = np.zeros(X_test.shape[0])

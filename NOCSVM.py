@@ -1,8 +1,5 @@
 import pandas as pd
-import numpy as np
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
-from sklearn import svm
-from sklearn.model_selection import cross_val_score
 from sklearn.svm import OneClassSVM
 from sklearn.mixture import GaussianMixture
 import time
@@ -15,7 +12,35 @@ from latent import Autoencoder
 import torch.optim as optim
 import torch.nn as nn
 from tensorflow import keras
+# This is AE—NOCSVM-GMM Model
 
+# This is my first try to add the nested ocsvm
+def nested_ocsvm(data, n_layers, gamma='auto'):
+
+    best_thresh  = []
+    for layer in range(n_layers):
+        print(layer)
+        ocsvm = OneClassSVM(gamma=gamma,  verbose=2)
+        ocsvm.fit(data)
+        scores = -ocsvm.score_samples(data)
+        fpr, tpr, thresholds = roc_curve(np.zeros(data.shape[0]), scores)
+        J = tpr - fpr
+        ix = np.argmax(J)
+        #best_thresh = thresholds [ix]
+        best_thresh.append(np.percentile(thresholds, 80) )
+
+        y_pred = np.array([0 if score < best_thresh else 1 for score in scores])
+        # Predict the labels (1 for outliers, 0 for inliers)
+
+        # Filter the inliers for the next layer of training
+        data = data[y_pred == 1]
+        if  data.shape[0] ==0:
+            print("leider")
+            break
+    return ocsvm,best_thresh
+
+# Load data
+# Load data
 set = "UNSW"
 
 # Load  NSL-KDD data
@@ -61,6 +86,8 @@ else:
 
 
 
+
+
 # Data scaling  nslkdd already done
 scaler = MinMaxScaler()
 
@@ -73,7 +100,6 @@ print("NSLkdd")
 print("Train Set")
 print("train_set_orginal")
 
-
 model = Autoencoder(train_set_orginal.shape[1])
 optimizer = keras.optimizers.Adam()
 loss_fn = keras.losses.MeanSquaredError()
@@ -83,14 +109,40 @@ model.fit(train_set_orginal, train_set_orginal, batch_size=64, epochs=100)
 
 
 train_normal_or = model.get_reconstruction_error(train_set_orginal)
+latent_representations = model.get_latent_representations(train_set_orginal.values)
+
+
+latent_representations = scaler.fit_transform(latent_representations)
+
+# Train Nested OCSVM
+ # Number of layers for nested OCSVM
+start_time = time.time()
+ocsvm = OneClassSVM(gamma='auto', verbose=2)
+ocsvm.fit(latent_representations)
+
+
+scores = -ocsvm.score_samples(latent_representations)
+
+best_thresh = np.percentile(scores, 80)
+print('Best Threshold=%f' % (best_thresh))
+
+svc_duration = time.time() - start_time
+
+
+# Training GaussianMixture
+start_time = time.time()
+gmm = GaussianMixture(n_components=15, covariance_type='full')
+gmm.fit(latent_representations)
+gmm_duration = time.time() - start_time
+
+print(f"Trained Nested OCSVM in {svc_duration:.2f} seconds")
+print(f"Trained GaussianMixture in {gmm_duration:.2f} seconds")
 
 
 
+nocsvm =OneClassSVM(gamma='auto', verbose=2)
 
 
-
-###test
-# Initialize StratifiedKFold
 n_folds = 5
 skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
 
@@ -105,23 +157,60 @@ for train_index, test_index in skf.split(test_set, true_labels):
     X_train, X_test = test_set.iloc[train_index], test_set.iloc[test_index]
     y_train, y_test = true_labels[train_index], true_labels[test_index]
 
+    # Predictions using OCSVM
     X_train_nomaly = X_train[y_train == 1]
+    model.fit(X_train_nomaly, X_train_nomaly, batch_size=64, epochs=10)
 
-    model.fit(X_train_nomaly , X_train_nomaly , batch_size=64, epochs=10)
-    train_normal_re = model.get_reconstruction_error(X_train_nomaly)
-    alpha = 1
-    threshold = np.concatenate([train_normal_re, train_normal_or]).mean() * alpha
-    best_thresh = np.percentile(np.concatenate([train_normal_re, train_normal_or]), 90)
+    train_latent_representations = model.get_latent_representations(X_train_nomaly.values)
+    test_latent_representations = model.get_latent_representations(X_test.values)
+    train_latent_representations = scaler.fit_transform(train_latent_representations)
+    test_latent_representations = scaler.fit_transform(test_latent_representations)
 
-    test_label_predict = model.predict_class(X_test, best_thresh)
+
+    ocsvm.fit(train_latent_representations )
+    t_scores = -ocsvm.score_samples(train_latent_representations)
+    best_thresh = np.percentile(t_scores, 70)
+    gmm.fit(train_latent_representations)
+    # Calculate GMM scores
+    t_sco = -gmm.score_samples(train_latent_representations)
+    probability_threshold = np.percentile(t_sco,90)
+
+
+    y_scores = -ocsvm.score_samples(test_latent_representations)
+    print('Best Threshold=%f' % (best_thresh))
+
+
+    y_pred = np.array([0 if score < best_thresh else 1 for score in y_scores])
+
+
+    # Calculate GMM scores
+    gmm_scores = -gmm.score_samples(test_latent_representations)
 
 
     y_test = 1 - (y_test + 1) / 2
+    # Boolean array where True indicates an outlier
+    #verified_anomalies = (y_pred == 1)
 
-    verified_anomalies = (test_label_predict == 1)
+    normal_indices1 = np.where((y_pred == 1) & (gmm_scores <= probability_threshold))[0]
+    normal_indices2 = np.where((y_pred == 0) & (gmm_scores > probability_threshold))[0]
+    normal_indices = np.concatenate((normal_indices1, normal_indices2))
+
+    nocsvm.fit(test_latent_representations[normal_indices])
+    n_scores = -nocsvm.score_samples(test_latent_representations[normal_indices])
+    best_thresh = np.percentile(n_scores, 10)
+
+    # 对判定为正常的数据再次进行判定
+    y_pred_second_pass = np.array([0 if score < best_thresh else 1 for score in n_scores])
+
+
+    # 将二次判定结果更新到第一次判定的结果中
+    y_pred[normal_indices] = y_pred_second_pass
+    probability_threshold = np.percentile(t_sco, 90)
+    verified_anomalies = (y_pred == 1)& (gmm_scores > probability_threshold)
+
 
     # Convert verified_anomalies to the same format as true labels
-    verified_anomaly_preds = np.zeros(X_test.shape[0])
+    verified_anomaly_preds = np.zeros(y_pred.shape[0])
     verified_anomaly_preds[verified_anomalies] = 1
 
     # Calculate the accuracy for the current fold
@@ -147,7 +236,7 @@ for train_index, test_index in skf.split(test_set, true_labels):
     FP = conf_matrix[0, 1]  # False Positives
     fpr = FP / (FP + TN) if (FP + TN) > 0 else 0
     fpr_scores.append(fpr)
-
+    print( roc_auc_score(y_test, y_scores))
 
 # Calculate the mean accuracy, precision, recall, and F1-score across all folds
 mean_accuracy = np.mean(accuracy_scores)

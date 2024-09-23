@@ -11,11 +11,13 @@ from sklearn.metrics import precision_score, recall_score, f1_score, confusion_m
 from sklearn.model_selection import KFold
 from sklearn.metrics import roc_curve
 import numpy as np
-from latent import Autoencoder
-import torch.optim as optim
-import torch.nn as nn
-from tensorflow import keras
 
+# This is OCSVM-GMM Model
+
+
+
+
+# Load data
 set = "UNSW"
 
 # Load  NSL-KDD data
@@ -74,19 +76,29 @@ print("Train Set")
 print("train_set_orginal")
 
 
-model = Autoencoder(train_set_orginal.shape[1])
-optimizer = keras.optimizers.Adam()
-loss_fn = keras.losses.MeanSquaredError()
-model.compile(optimizer, loss_fn)
+# Train Nested OCSVM
+ # Number of layers for nested OCSVM
+start_time = time.time()
+ocsvm = OneClassSVM(gamma='auto', verbose=2)
+ocsvm.fit(train_set)
+# 保存模型
+#joblib.dump(ocsvm, 'ocsvm_model.pkl')
+scores = -ocsvm.score_samples(train_set)
 
-model.fit(train_set_orginal, train_set_orginal, batch_size=64, epochs=100)
+best_thresh = np.percentile(scores, 80)
+print('Best Threshold=%f' % (best_thresh))
+
+svc_duration = time.time() - start_time
 
 
-train_normal_or = model.get_reconstruction_error(train_set_orginal)
+# Training GaussianMixture
+start_time = time.time()
+gmm = GaussianMixture(n_components=1, covariance_type='full')
+gmm.fit(train_set)
+gmm_duration = time.time() - start_time
 
-
-
-
+print(f"Trained  OCSVM in {svc_duration:.2f} seconds")
+print(f"Trained GaussianMixture in {gmm_duration:.2f} seconds")
 
 
 ###test
@@ -104,21 +116,33 @@ fpr_scores = []
 for train_index, test_index in skf.split(test_set, true_labels):
     X_train, X_test = test_set.iloc[train_index], test_set.iloc[test_index]
     y_train, y_test = true_labels[train_index], true_labels[test_index]
-
+    yp = ocsvm.predict(X_test)
+    print(accuracy_score(y_test, yp))
+    # Predictions using OCSVM
     X_train_nomaly = X_train[y_train == 1]
+    ocsvm.fit(X_train_nomaly )
+    #t_scores = -ocsvm.score_samples(X_train_nomaly)
+    #best_thresh = np.percentile(t_scores, 70)
+    gmm.fit(X_train_nomaly)
+    # Calculate GMM scores
+    t_sco = -gmm.score_samples(X_train_nomaly)
+    probability_threshold = np.percentile(t_sco, 90)
 
-    model.fit(X_train_nomaly , X_train_nomaly , batch_size=64, epochs=10)
-    train_normal_re = model.get_reconstruction_error(X_train_nomaly)
-    alpha = 1
-    threshold = np.concatenate([train_normal_re, train_normal_or]).mean() * alpha
-    best_thresh = np.percentile(np.concatenate([train_normal_re, train_normal_or]), 90)
+    y_scores = -ocsvm.score_samples(X_test)
+    print('Best Threshold=%f' % (best_thresh))
 
-    test_label_predict = model.predict_class(X_test, best_thresh)
+
+    #best_thresh = thresholds[ix]
+    y_pred =ocsvm.predict(X_test)
+    #y_pred = np.array([0 if score < best_thresh else 1 for score in y_scores])
+
+    # Calculate GMM scores
+    gmm_scores = -gmm.score_samples(X_test)
 
 
     y_test = 1 - (y_test + 1) / 2
-
-    verified_anomalies = (test_label_predict == 1)
+    # Boolean array where True indicates an outlier
+    verified_anomalies = (y_pred == -1)   & (gmm_scores > probability_threshold)
 
     # Convert verified_anomalies to the same format as true labels
     verified_anomaly_preds = np.zeros(X_test.shape[0])
@@ -147,7 +171,7 @@ for train_index, test_index in skf.split(test_set, true_labels):
     FP = conf_matrix[0, 1]  # False Positives
     fpr = FP / (FP + TN) if (FP + TN) > 0 else 0
     fpr_scores.append(fpr)
-
+    print( roc_auc_score(y_test, y_scores))
 
 # Calculate the mean accuracy, precision, recall, and F1-score across all folds
 mean_accuracy = np.mean(accuracy_scores)

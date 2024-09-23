@@ -7,35 +7,37 @@ import matplotlib.pyplot as plt
 
 
 class AE(nn.Module):
-
-    def __init__(self, M_type, train_features, init_lr, active_f , input_size, hidden_size, output_size, train_dataset,num_train,train_size):
+    def __init__(self, M_type, train_features, init_lr, active_f , input_size, hidden_size, output_size, num_train, train_size):
         super(AE, self).__init__()
         self.M_type = M_type
         self.train_features = train_features
-        self.train_dataset = train_dataset
+
         self.init_lr = init_lr
         self.active_f = nn.ELU
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
-        self.num_train = num_train  # 训练的总轮数，表示整个数据集将被遍历多少次。
+        self.num_train = num_train  # Total training epochs
         self.train_size = train_size
         self.features_rank = []
 
-
         # Encoder
-        # Ensure activation functions are used as layers within nn.Sequential
         self.encoder = nn.Sequential(
             nn.Linear(input_size, hidden_size[0]),
-            self.active_f(),  # Instantiate ELU as a module
+            nn.ELU(),
             nn.Linear(hidden_size[0], hidden_size[1]),
-            self.active_f() # Again, instantiate ELU
+            nn.ELU(),
+            nn.Linear(hidden_size[1], hidden_size[2]),
+            nn.ELU(),
         )
-        self.latent = nn.Linear(hidden_size[1], hidden_size[2])
-        self.decoder = nn.Sequential(
 
-            nn.ELU(),  # Proper instantiation
-            nn.Linear(hidden_size[2], output_size),
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(hidden_size[2], hidden_size[3]),
+            nn.ELU(),
+            nn.Linear(hidden_size[3], hidden_size[4]),
+            nn.ELU(),
+            nn.Linear(hidden_size[4], output_size),
             nn.Sigmoid()  # Sigmoid for output activation
         )
 
@@ -47,18 +49,35 @@ class AE(nn.Module):
     def forward(self, x):
         x = self.encoder(x)
         x = self.dropout(x)
-        latent = self.latent(x)
+        latent = x
         x = self.decoder(latent)
 
         return x, latent
 
-def training(M_type, train_features, init_lr, active_f, input_size, hidden_size, output_size, train_dataset,num_train,train_size):
+    def get_latent_representations(self, x):
+        # Ensure the tensor is detached from the computation graph
+        return self.encoder(x).detach().cpu().numpy()
+
+    def predict(self, x, threshold):
+        reconstruction_error = self.get_reconstruction_error(x)
+        return np.where(reconstruction_error <= threshold, '0', '1')
+
+    def get_reconstruction_error(self, x):
+        # Forward pass to get the reconstructed output
+        reconstructed, _ = self.forward(x)
+        # Calculate the mean squared error per sample
+        reconstruction_error = torch.mean((x - reconstructed) ** 2, dim=1)
+        return reconstruction_error.detach().cpu().numpy()
+
+
+
+def training(M_type, train_features, init_lr, active_f, input_size, hidden_size, output_size,num_train,train_size):
 
         batch_size = train_size
         torch.manual_seed(0)
         device = torch.device("cpu")
 
-        model = AE(M_type, train_features, init_lr, active_f, input_size, hidden_size, output_size, train_dataset,num_train,train_size)
+        model = AE(M_type, train_features, init_lr, active_f, input_size, hidden_size, output_size,num_train,train_size)
 
         optimizer = optim.Adam(model.parameters(), lr=init_lr)
 
@@ -130,8 +149,8 @@ def training(M_type, train_features, init_lr, active_f, input_size, hidden_size,
         # Data preparation for CSV
         df = pd.DataFrame(all_latent)
         df['Error'] = all_errors  # Add errors as a column in the DataFrame
-        # df.to_csv('latent_and_errors.csv', index=False)
-        # print("Latent features and errors saved to 'latent_and_errors.csv'")
+        df.to_csv('test_16_latent_and_errors.csv', index=False)
+        print("new Latent features and errors saved to 'latent_and_errors.csv'")
 
         return df
 
