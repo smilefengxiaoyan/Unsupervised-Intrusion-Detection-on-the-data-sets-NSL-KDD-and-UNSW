@@ -8,11 +8,11 @@ from sklearn.metrics import precision_score, recall_score, f1_score, confusion_m
 from sklearn.model_selection import KFold
 from sklearn.metrics import roc_curve
 import numpy as np
-from latent import Autoencoder
+from latent_AE import Autoencoder
 import torch.optim as optim
 import torch.nn as nn
 from tensorflow import keras
-# This is AE—NOCSVM-GMM Model
+# This is AEdropout—NOCSVM-GMM Model
 
 # This is my first try to add the nested ocsvm
 def nested_ocsvm(data, n_layers, gamma='auto'):
