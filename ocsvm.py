@@ -12,7 +12,7 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import roc_curve
 import numpy as np
 
-# This is AE—NOCSVM-GMM Model
+# This is OCSVM Model
 
 
 

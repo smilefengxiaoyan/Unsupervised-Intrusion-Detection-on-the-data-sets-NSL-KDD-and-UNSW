@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score,confusion_matrix
 
 
-# This the baseline
+# This the baseline for GMM model
 
 set = "UNSW"
 
